@@ -13,6 +13,17 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+
+  // src/components/ui holds shadcn/ui registry source, managed by the shadcn
+  // CLI. It is vendored, not hand-authored, so lint rules that reject its
+  // documented patterns are relaxed here rather than patched into files that
+  // `shadcn add --overwrite` would revert.
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
