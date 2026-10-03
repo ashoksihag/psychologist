@@ -55,14 +55,36 @@ await page.getByLabel(/Anything else/).fill("Mornings preferred.");
 await page.waitForTimeout(150);
 await page.getByRole("button", { name: /Send my request/ }).click();
 
-// --- Success
-await page.waitForSelector("text=Thank you", { timeout: 15000 });
+// --- Outcome. Production confirms the send; a static preview confirms that it
+// deliberately did NOT. Both are correct, so assert whichever the build implies.
+const heading = page.locator("#consultation h3").first();
+await heading.waitFor({ timeout: 15000 });
 await page.waitForTimeout(400);
 console.log(`after submit -> step ${await step()}`);
-console.log(`success heading: ${await page.locator("h3").first().innerText()}`);
-console.log(`summary contains name: ${(await page.locator("dl").innerText()).replace(/\s+/g, " ")}`);
 
-await page.screenshot({ path: ".screenshots/desktop-consultation-success.png" });
+const outcome = (await heading.innerText()).trim();
+const isPreview = /this is a preview/i.test(outcome);
+console.log(`mode: ${isPreview ? "static preview (no send)" : "production (webhook)"}`);
+console.log(`outcome heading: ${JSON.stringify(outcome)}`);
+
+// The confirmation panel must summarise exactly what was entered, either way.
+const summary = (await page.locator("#consultation dl").innerText()).replace(/\s+/g, " ");
+console.log(`summary: ${summary}`);
+if (!/Myself \(adult\)/.test(summary) || !/Anxiety/.test(summary)) {
+  throw new Error(`summary did not echo the answers: ${summary}`);
+}
+if (!isPreview) {
+  if (!/Thank you, Asha/.test(outcome)) {
+    throw new Error(`expected the sent confirmation, got: ${outcome}`);
+  }
+} else {
+  const panel = await page.locator("#consultation").innerText();
+  if (!/has not been sent or stored anywhere/.test(panel)) {
+    throw new Error("preview mode did not disclose that nothing was sent");
+  }
+}
+
+await page.screenshot({ path: ".screenshots/desktop-consultation-outcome.png" });
 
 console.log(`console errors during flow: ${errors.length}`);
 for (const e of errors) console.log(`  [error] ${e.slice(0, 160)}`);

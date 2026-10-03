@@ -37,6 +37,10 @@ yarn-error.log*
 # local verification output (Edge screenshots + report)
 /.screenshots
 
+# static preview build output
+/out
+/.preview-stash
+
 # vercel
 .vercel
 

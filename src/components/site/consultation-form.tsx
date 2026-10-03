@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  Eye,
   Loader2,
   Lock,
   Pencil,
@@ -172,7 +173,14 @@ function validateStep(step: number, values: FormState): FieldErrors {
 /* Component                                                          */
 /* ------------------------------------------------------------------ */
 
-type Status = "idle" | "submitting" | "success" | "error";
+type Status = "idle" | "submitting" | "success" | "preview" | "error";
+
+/**
+ * Baked in at build time. A static preview (GitHub Pages) has no server to
+ * receive the enquiry, so the form stops at validation and says so plainly
+ * rather than firing a request that can only fail.
+ */
+const IS_PREVIEW = process.env.NEXT_PUBLIC_PREVIEW === "1";
 
 export function ConsultationForm() {
   const [step, setStep] = React.useState(1);
@@ -236,9 +244,6 @@ export function ConsultationForm() {
       return;
     }
 
-    setStatus("submitting");
-    setErrorMessage(null);
-
     const payload: LeadPayload = {
       name: values.name.trim(),
       phone: values.phone.trim(),
@@ -250,6 +255,16 @@ export function ConsultationForm() {
       source: "manmitra-website",
       submittedAt: new Date().toISOString(),
     };
+
+    // A static preview has no API route to post to. Stop after validation
+    // rather than firing a request that would only ever 404.
+    if (IS_PREVIEW) {
+      setStatus("preview");
+      goTo(4);
+      return;
+    }
+
+    setStatus("submitting");
 
     try {
       const res = await fetch("/api/lead", {
@@ -277,7 +292,10 @@ export function ConsultationForm() {
     }
   };
 
-  const progress = status === "success" ? 100 : ((step - 1) / TOTAL_STEPS) * 100;
+  const progress =
+    status === "success" || status === "preview"
+      ? 100
+      : ((step - 1) / TOTAL_STEPS) * 100;
 
   return (
     <Section id="consultation" edge="cream" spacing="default">
@@ -339,7 +357,8 @@ export function ConsultationForm() {
                   {STEPS.map((s, i) => {
                     const index = i + 1;
                     const state =
-                      status === "success" || index < step
+                      (status === "success" || status === "preview") ||
+                      index < step
                         ? "done"
                         : index === step
                           ? "current"
@@ -416,26 +435,60 @@ export function ConsultationForm() {
                   : `Step ${Math.min(step, TOTAL_STEPS)} of ${TOTAL_STEPS}`}
               </div>
 
-              {/* ------------------------------------------ Success */}
-              {status === "success" ? (
+              {/* --------------------------------- Success / Preview */}
+              {status === "success" || status === "preview" ? (
                 <div className="flex flex-col items-start py-6">
-                  <span className="grid size-14 place-items-center rounded-2xl bg-forest-800/8 text-forest-700">
-                    <CheckCircle2 aria-hidden className="size-7" />
+                  <span
+                    className={cn(
+                      "grid size-14 place-items-center rounded-2xl",
+                      status === "preview"
+                        ? "bg-terracotta-100 text-terracotta-700"
+                        : "bg-forest-800/8 text-forest-700",
+                    )}
+                  >
+                    {status === "preview" ? (
+                      <Eye aria-hidden className="size-7" />
+                    ) : (
+                      <CheckCircle2 aria-hidden className="size-7" />
+                    )}
                   </span>
                   <h3
                     ref={headingRef}
                     tabIndex={-1}
                     className="mt-6 font-heading text-2xl font-semibold tracking-[-0.015em] outline-none"
                   >
-                    Thank you, {values.name.split(" ")[0]}. We have your request.
+                    {status === "preview"
+                      ? `Almost there, ${values.name.split(" ")[0]} — this is a preview.`
+                      : `Thank you, ${values.name.split(" ")[0]}. We have your request.`}
                   </h3>
                   <p className="mt-3 max-w-lg text-base leading-relaxed text-pretty text-ink-muted">
-                    We will reach out on{" "}
-                    <span className="font-medium text-ink">
-                      {values.phone}
-                    </span>{" "}
-                    within one working day. Nothing you wrote here is shared
-                    with anyone else.
+                    {status === "preview" ? (
+                      <>
+                        Everything validated exactly as it will in production —
+                        but this draft is hosted as static files, so there is no
+                        server to receive it and{" "}
+                        <strong className="font-medium text-ink">
+                          your enquiry has not been sent or stored anywhere
+                        </strong>
+                        . To send it for real, please call{" "}
+                        <a
+                          href={siteConfig.contact.phoneHref}
+                          className="font-medium text-forest-700 underline underline-offset-4"
+                        >
+                          {siteConfig.contact.phone}
+                        </a>
+                        .
+                      </>
+                    ) : (
+                      <>
+                        We will reach out on{" "}
+                        <span className="font-medium text-ink">
+                          {values.phone}
+                        </span>{" "}
+                        within one working day. Nothing you wrote here is
+                        shared with anyone else.
+                      </>
+                    )}
                   </p>
                   <dl className="mt-7 w-full max-w-lg rounded-2xl border border-border bg-sand-100/60 p-5 text-sm">
                     <div className="flex justify-between gap-4 py-1.5">

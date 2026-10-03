@@ -1,0 +1,55 @@
+name: Deploy draft preview to GitHub Pages
+
+# Every push to master republishes the static preview.
+# The live site should be deployed from a real Node host (Vercel, Railway,
+# a VPS…) so that the enquiry form can reach the /api/lead webhook relay.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race for the same Pages slot.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build static preview
+        run: npm run build:preview
+        env:
+          # A project Pages site lives at /<repo-name>. A user/org site would
+          # use an empty string here instead.
+          GITHUB_BASE_PATH: /${{ github.event.repository.name }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

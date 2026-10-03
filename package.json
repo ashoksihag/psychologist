@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "build:preview": "node scripts/build-preview.mjs",
+    "preview:serve": "node scripts/preview-server.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:form": "node scripts/verify-form.mjs"
   },
